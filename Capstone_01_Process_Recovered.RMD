@@ -1,0 +1,732 @@
+---
+title: "Capstone 01 Process"
+author: "Tim Andaya"
+date: "2025-04-15"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## It was necessary to create an ODBC connector for an SQL Server
+## due to my preference of working with the datasets stored in 
+## .csv files into a more robust application.
+# ----------------------------------------------------------------------
+```{r}
+install.packages("odbc")
+install.packages("tidyverse")
+
+```
+
+# ----------------------------------------------------------------------
+```{r}
+library(odbc)
+library(tidyverse)
+```
+# ----------------------------------------------------------------------
+```{r}
+con <- dbConnect(odbc(),
+                 Driver = "SQL Server",
+                 Server = "TABITHA",
+                 Database = "GDAC",
+                 UID = "rgdac",
+                 PWD = rstudioapi::askForPassword("Database password"),
+                 Port = 1433)
+```
+
+# ----------------------------------------------------------------------
+```{r}
+# # ----------------------------------------------------------------------
+# # Helper functions to run the query and report status
+# # ----------------------------------------------------------------------
+#' Run a non-query SQL command
+#' @param con A DBI connection object
+#' @param query SQL query as a string
+#' @param label Optional label for logging
+#' @return NULL, prints message
+#' @export
+run_query <- function(con, query, label = NULL) {
+  tryCatch({
+    result <- DBI::dbExecute(con, query)
+    prefix <- if (!is.null(label)) paste0("[", label, "] ") else ""
+    if (result == 0) {
+      message(prefix, "Commands completed successfully.")
+    } else {
+      message(prefix, result, " rows affected.")
+    }
+  }, error = function(e) {
+    message("Error: ", e$message)
+  })
+}
+
+# # Execute the query (this line triggers the action)
+# run_query(con, query, label = "Create divvy_trips_xxxx_qx")
+
+#' Fetch data from a SQL query
+#'
+#' @param con A DBI connection object
+#' @param query SQL query as a string
+#' @param label Optional label for logging
+#'
+#' @return A data frame containing the result of the query, or NULL on error
+#' @export
+fetch_data <- function(con, query, label = NULL) {
+  tryCatch({
+    df <- DBI::dbGetQuery(con, query)
+    prefix <- if (!is.null(label)) paste0("[", label, "] ") else ""
+    message(prefix, "Query executed. ", nrow(df), " rows returned.")
+    return(df)
+  }, error = function(e) {
+    message("Error: ", e$message)
+    return(NULL)
+  })
+}
+
+```
+
+# ----------------------------------------------------------------------
+```{r Enable python}
+library(reticulate)
+#install.packages("pandas") 
+# remotes::install_github("pandas-dev/pandas") 
+# use_virtualenv("r-reticulate")
+# Method 1: Using py_run_string
+# py_run_string("import pandas as pd\n# Your pandas code here")
+
+```
+
+# ----------------------------------------------------------------------
+#Data:  Initial preparation and import into analysis and/or staging tables
+# ----------------------------------------------------------------------
+##Create analysis table gdac.dbo.divvy-tripdata
+# ----------------------------------------------------------------------
+```{r UNCOMMENT QUERY TO USE, echo=TRUE, message=TRUE, warning=TRUE}
+con
+query="--USE [GDAC]
+--GO
+
+--/****** Object:  Table [dbo].[divvy-tripdata]    Script Date: 4/15/2025 10:13:51 AM ******/
+--IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[divvy-tripdata]') AND type in (N'U'))
+--DROP TABLE [dbo].[divvy-tripdata]
+--GO
+
+--/****** Object:  Table [dbo].[divvy-tripdata]    Script Date: 4/15/2025 10:13:51 AM ******/
+--SET ANSI_NULLS ON
+--GO
+
+--SET QUOTED_IDENTIFIER ON
+--GO
+
+--CREATE TABLE [dbo].[divvy-tripdata](		    --	DTS Import specification
+--	[ride_id] [varchar](20) NULL,				      --	DT_STR	20				      RAW DATA
+--	[rideable_type] [varchar](30) NULL,		  	--	DT_STR	30				      RAW DATA
+--	[started_at] [datetime] NULL,				      --	DT_DATE					        RAW DATA
+--	[ended_at] [datetime] NULL,					      --	DT_DATE					        RAW DATA
+--	[start_station_name] [varchar](50) NULL,	--	DT_STR	50				      RAW DATA
+--	[start_station_id] [int] NULL,				    --	Four Byte Unsigned INT	RAW DATA
+--	[end_station_name] [varchar](50) NULL,		--	DT_STR	50				      RAW DATA
+--	[end_station_id] [int] NULL,				      --	Four Byte Unsigned INT	RAW DATA
+--	[start_lat] [decimal](8, 6) NULL,			    --	Float					          RAW DATA
+--	[start_lng] [decimal](9, 6) NULL,			    --	Float					          RAW DATA
+--	[end_lat] [decimal](8, 6) NULL,				    --	Float					          RAW DATA
+--	[end_lng] [decimal](9, 6) NULL,				    --	Float					          RAW DATA
+--	[member_casual] [varchar](10) NULL,			  --	Float					          RAW DATA
+--	[ride_length] [time](7) NULL,				      --	DT_DATE					        CALCULATED 
+--	[day_of_week] [int] NULL					        --	Four Byte Unsigned INT	CALCULATED
+--) ON [PRIMARY]
+--GO"
+
+# Execute the query (this line triggers the action)
+run_query(con, query, label = "Create table divvy-tripdata in GDAC database")
+```
+# ----------------------------------------------------------------------
+## Create staging table divvy_trips_xxxx_qx
+# ----------------------------------------------------------------------
+```{r UNCOMMENT QUERY TO USE, echo=TRUE, message=TRUE, warning=TRUE}
+# Database connection
+con
+
+# SQL query (currently commented out for modeling)
+query = "USE [GDAC]
+--GO
+
+--/****** Object:  Table [dbo].[divvy_trips_xxxx_qx]    Script Date: 4/21/2025 11:23:08 AM ******/
+--IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[divvy_trips_xxxx_qx]') AND type in (N'U'))
+--DROP TABLE [dbo].[divvy_trips_xxxx_qx]
+--GO
+
+--/****** Object:  Table [dbo].[divvy_trips_xxxx_qx]    Script Date: 4/21/2025 11:23:08 AM ******/
+--SET ANSI_NULLS ON
+--GO
+
+--SET QUOTED_IDENTIFIER ON
+--GO
+
+--CREATE TABLE [dbo].[divvy_trips_xxxx_qx](		    --	DTS Import specification	Comment
+--	[trip_id] [varchar](20) NULL,				    --	DT_
+--	[start_time] [datetime] NULL,				    --	DT_DATE					    RAW DATA
+--	[end_time] [datetime] NULL,						--	DT_DATE					    RAW DATA
+--	[bikeid] [varchar](50) NULL,				    --	DT_STR	50					RAW DATA
+--	[tripduration] [varchar](100) NULL,				--	DT_STR	100					RAW DATA
+--	[from_station_id] [varchar](100) NULL,			--	DT_STR	100					RAW DATA
+--	[from_station_name] [varchar](100) NULL,		--	DT_STR	100					RAW DATA
+--	[to_station_id] [varchar](100) NULL,			--	DT_STR	100					RAW DATA
+--	[to_station_name] [varchar](100) NULL,			--	DT_STR	100					RAW DATA
+--	[usertype] [varchar](100) NULL,					--	DT_STR	100					RAW DATA
+--	[gender] [varchar](50) NULL,				    --	DT_STR	50					RAW DATA
+--	[birthyear] [varchar](50) NULL,				    --	DT_STR	50					RAW DATA
+--	[ride_length] [varchar](50) NULL,				--	DT_STR	50					CALCULATED
+--	[day_of_week] [varchar](50) NULL				--	DT_STR	50					CALCULATED
+--) ON [PRIMARY]
+--GO"
+
+# Execute the query (this line triggers the action)
+run_query(con, query, label = "Create divvy_trips_xxxx_qx")
+
+```
+
+ NOTES:
+      Calculations will need to get adjusted for the non 
+      xxxx-divvy-tripdata files as/if necessary and will be handled 
+      after the files have been imported into either the main analysis
+      database, gdac.dbo.divvy-tripdata, or the staging table created 
+      for the divvy_trips_YYYY_QX files format  
+      Problematic files have commas in the data where numeric values exceed
+      999.99, a reason why I use pipes as a delimiter when I export data; 
+      I created a python script to address this in all data sets.  
+      Additionally, this script will add the two new column headings and 
+      corresponding commas at the data level and finally, confirm that 
+      each line has a hard return.
+  
+##Python was used to interate trough the files.
+*Add two column names to the header; ride_length & day_of_week.
+*Add two commas on each data line.
+*Add a hard line return to the end of each line.
+*Each modified file's content was added to a new file.
+
+##Python first stage data cleanup file set 1
+
+```{python Modify xxx-divvy-tripdata CSV Files}
+import csv
+import re
+import os
+from pathlib import Path
+
+def clean_numeric_field(value):
+    # Remove commas from numeric strings (both quoted and unquoted)
+    if re.fullmatch(r'\d{1,3}(,\d{3})*(\.\d+)?', value):
+        return value.replace(',', '')
+    return value
+
+def process_csv(input_file, output_file):
+    if not os.path.exists(input_file):
+        print(f"Input file not found: {input_file}")
+        return
+
+    with open(input_file, 'r', encoding='utf-8', newline='') as infile, \
+         open(output_file, 'w', encoding='utf-8', newline='\n') as outfile:
+
+        reader = csv.reader(infile, delimiter=',', quotechar='"')
+        writer = csv.writer(outfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+        headers = next(reader)
+        headers += ['ride_length', 'day_of_week']
+        writer.writerow(headers)
+
+        line_count = 0
+        for row in reader:
+            cleaned_row = []
+            for field in row:
+                cleaned = clean_numeric_field(field)
+                # Uncomment this line to debug field changes:
+                # if cleaned != field:
+                #     print(f"Changed: {field} -> {cleaned}")
+                cleaned_row.append(cleaned)
+            cleaned_row += ['', '']
+            writer.writerow(cleaned_row)
+            line_count += 1
+
+        print(f"Processed {line_count} rows. Output saved to: {output_file}")
+
+# === Batch Processing ===
+
+input_dir = Path(r'\\tabitha\gdac$\CS1')
+output_dir = input_dir  # Or change to another Path if needed
+
+# List of input files to process
+file_names = [
+"202004-divvy-tripdata.csv",
+"202005-divvy-tripdata.csv",
+"202006-divvy-tripdata.csv",
+"202007-divvy-tripdata.csv",
+"202008-divvy-tripdata.csv",
+"202009-divvy-tripdata.csv",
+"202010-divvy-tripdata.csv",
+"202011-divvy-tripdata.csv",
+"202012-divvy-tripdata.csv",
+"202101-divvy-tripdata.csv",
+"202102-divvy-tripdata.csv",
+"202103-divvy-tripdata.csv",
+"202104-divvy-tripdata.csv",
+"202105-divvy-tripdata.csv",
+"202106-divvy-tripdata.csv",
+"202107-divvy-tripdata.csv",
+"202108-divvy-tripdata.csv",
+"202109-divvy-tripdata.csv",
+"202110-divvy-tripdata.csv",
+"202111-divvy-tripdata.csv",
+"202112-divvy-tripdata.csv",
+"202201-divvy-tripdata.csv",
+"202202-divvy-tripdata.csv",
+"202203-divvy-tripdata.csv",
+"202204-divvy-tripdata.csv",
+"202205-divvy-tripdata.csv",
+"202206-divvy-tripdata.csv",
+"202207-divvy-tripdata.csv",
+"202208-divvy-tripdata.csv",
+"202209-divvy-publictripdata.csv",
+"202210-divvy-tripdata.csv",
+"202211-divvy-tripdata.csv",
+"202212-divvy-tripdata.csv",
+"202301-divvy-tripdata.csv",
+"202302-divvy-tripdata.csv",
+"202303-divvy-tripdata.csv",
+"202304-divvy-tripdata.csv",
+"202305-divvy-tripdata.csv",
+"202306-divvy-tripdata.csv",
+"202307-divvy-tripdata.csv",
+"202308-divvy-tripdata.csv",
+"202309-divvy-tripdata.csv",
+"202310-divvy-tripdata.csv",
+"202311-divvy-tripdata.csv",
+"202312-divvy-tripdata.csv",
+"202401-divvy-tripdata.csv",
+"202402-divvy-tripdata.csv",
+"202403-divvy-tripdata.csv",
+"202404-divvy-tripdata.csv",
+"202405-divvy-tripdata.csv",
+"202406-divvy-tripdata.csv",
+"202407-divvy-tripdata.csv",
+"202408-divvy-tripdata.csv",
+"202409-divvy-tripdata.csv",
+"202410-divvy-tripdata.csv",
+"202411-divvy-tripdata.csv",
+"202412-divvy-tripdata.csv",
+"202501-divvy-tripdata.csv",
+"202502-divvy-tripdata.csv",
+"202503-divvy-tripdata.csv",
+"Divvy_Trips_2020_Q1.csv"
+]
+
+# Process each file
+for file_name in file_names:
+    input_path = input_dir / file_name
+    output_name = file_name.replace(".csv", "_PyTgt.csv")
+    output_path = output_dir / output_name
+    process_csv(str(input_path), str(output_path))
+
+```
+
+# ----------------------------------------------------------------------
+## Python first stage data cleanup file set 2
+# ----------------------------------------------------------------------
+```{python Modify divvy-trips_xxxx_qx CSV Files}
+import csv
+import re
+import os
+from pathlib import Path
+
+def clean_numeric_field(value):
+    # Remove commas from numeric strings (e.g., 1,783.0 → 1783.0)
+    if re.fullmatch(r'\d{1,3}(,\d{3})*(\.\d+)?', value):
+        return value.replace(',', '')
+    return value
+
+def process_csv(input_file, output_file):
+    if not os.path.exists(input_file):
+        print(f"Input file not found: {input_file}")
+        return
+
+    with open(input_file, 'r', encoding='utf-8', newline='') as infile, \
+         open(output_file, 'w', encoding='utf-8', newline='\n') as outfile:
+
+        reader = csv.reader(infile, delimiter=',', quotechar='"')
+        writer = csv.writer(outfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+        headers = next(reader)
+        headers += ['ride_length', 'day_of_week']
+        writer.writerow(headers)
+
+        line_count = 0
+        for row in reader:
+            cleaned_row = []
+            for field in row:
+                cleaned = clean_numeric_field(field)
+                # Uncomment this line to debug field changes:
+                # if cleaned != field:
+                #     print(f"Changed: {field} -> {cleaned}")
+                cleaned_row.append(cleaned)
+            cleaned_row += ['', '']
+            writer.writerow(cleaned_row)
+            line_count += 1
+
+        print(f"Processed {line_count} rows. Output saved to: {output_file}")
+
+# === Batch Processing ===
+
+input_dir = Path(r'\\tabitha\gdac$\CS1')
+output_dir = input_dir  # Or change to another Path if needed
+
+file_names = [
+    "Divvy_Trips_2019_Q1.csv",
+    "Divvy_Trips_2019_Q2.csv",
+    "Divvy_Trips_2019_Q3.csv",
+    "Divvy_Trips_2019_Q4.csv"
+]
+
+for file_name in file_names:
+    input_path = input_dir / file_name
+    output_name = file_name.replace(".csv", "_PyTgt.csv")
+    output_path = output_dir / output_name
+    process_csv(str(input_path), str(output_path))
+```
+
+# ----------------------------------------------------------------------
+##Load files into tables
+# ----------------------------------------------------------------------
+I created a cursor script to bulk load the data, I found problems with 
+  the data that were collected near the end of 2024 to March of 2025; 
+  it would seem that some form of collection paradigm shift occurred 
+  in June of 2024
+
+###divvy-tripdata records
+    CSV files with YYYYMM-divvy-tripdata naming convention that have valid
+    dates import into the gdac.dbo.divvy-tripdata table without issue.
+
+##divvy_Trips_YYYY_Qx 
+    Files with the naming convention Divvy_Trips_ must be loaded into a 
+    staging table, transformed prior to insertion into 
+    gdac.dbo.divvy-trips_xxxx_qx after they have been modified using 
+    python to add two new columns, ride_length and day_of_week, stripping
+    out commas from numerical values encapsulated by double quotes, and 
+    adding two commas at the end of each data line to create the new
+    field data placeholders.
+    Again, while I could manually import the data, this was inefficient; I 
+    needed a quicker and more streamline method.  On top of that, Excel
+    could not open the larger quarterly files for manipulation without 
+    data loss.
+
+#### divvy_Trips_YYYY_Qx BCP Format File
+    A format file for the quarterly tables that matched the
+    staging table was required to load these files
+
+    <?xml version="1.0"?>
+    <BCPFORMAT xmlns="http://schemas.microsoft.com/sqlserver/2004/bulkload/format" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+     <RECORD>
+      <FIELD ID="1" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="20" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="2" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="24"/>
+      <FIELD ID="3" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="24"/>
+      <FIELD ID="4" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="5" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="6" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="7" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="8" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="9" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="10" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="11" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="12" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="13" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+      <FIELD ID="14" xsi:type="CharTerm" TERMINATOR="\r\n" MAX_LENGTH="50" 
+        COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+     </RECORD>
+     <ROW>
+      <COLUMN SOURCE="1" NAME="trip_id" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="2" NAME="start_time" xsi:type="SQLDATETIME"/>
+      <COLUMN SOURCE="3" NAME="end_time" xsi:type="SQLDATETIME"/>
+      <COLUMN SOURCE="4" NAME="bikeid" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="5" NAME="tripduration" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="6" NAME="from_station_id" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="7" NAME="from_station_name" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="8" NAME="to_station_id" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="9" NAME="to_station_name" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="10" NAME="usertype" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="11" NAME="gender" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="12" NAME="birthyear" xsi:type="SQLVARYCHAR"/>
+      <COLUMN SOURCE="13" NAME="ride_length" xsi:type="SQLVARYCHAR" NULLABLE="YES"/>
+      <COLUMN SOURCE="14" NAME="day_of_week" xsi:type="SQLVARYCHAR" NULLABLE="YES"/>
+     </ROW>
+    </BCPFORMAT>
+
+# ----------------------------------------------------------------------
+## Load gdac.dbo.divvy-tripdata table
+# ----------------------------------------------------------------------
+```{r SQL CSV load stored procedure}
+con
+query = "--exec up_load_divvy @task = 0"
+
+run_query(con, query, "BULK LOAD CSV DATA")
+
+```
+##Update calculated fields
+
+```{r SQL calculate ride length and day of the week values}
+con
+query = "
+UPDATE dtxq
+set ride_length = CONVERT(char(10),end_time-start_time, 108)
+	-- CAST(CAST(ROUND(dbo.invoice_line.qty_shipped, 0) as int) as varchar(40))
+	,day_of_week =CAST(CAST(ROUND(DATEPART(WEEKDAY,start_time), 0) AS INT) AS VARCHAR(1))
+FROM [dbo].[divvy_trips_xxxx_qx] dtxq"
+
+run_query(con,query,"Update divvy_trips_xxxx_qx ride length and day of week values")
+```
+  
+```{r SQL calculate ride length and day of the week values}
+con
+query = "
+UPDATE dt
+set ride_length = CONVERT(char(10),ended_at-started_at, 108)
+	-- CAST(CAST(ROUND(dbo.invoice_line.qty_shipped, 0) as int) as varchar(40))
+	,day_of_week =CAST(CAST(ROUND(DATEPART(WEEKDAY,started_at), 0) AS INT) AS VARCHAR(1))
+FROM [dbo].[divvy-tripdata] dt"
+
+run_query(con,query,"Update divvy_trips_xxxx_qx ride length and day of week values")
+```
+##Data differences between standard tripdata and trip_xxxx_qx
+  The Quarterly data for 2019 used user type identitifier "Customer"
+  and "Subscribber", the rest of the data tables, including the
+  trips_2020_Q1 data used "casual" and "member".
+  The 2019 data in the trip_xxxx_qx table was updated to change the
+  records to replace "Customer" with "casual", and "Subscriber" with
+  "member".
+```{r update divvy_trips_xxxx_qx usertype data Customer}
+con
+query = "UPDATE dtxq
+SET usertype = 'casual'
+FROM [dbo].[divvy_trips_xxxx_qx] dtxq where usertype = 'Customer'"
+
+run_query(con,query,"Update divvy_trips_xxxx_qx usertype Customer to casual")
+```
+  
+```{r update divvy_trips_xxxx_qx usertype data Subscriber}
+con
+query = "UPDATE dtxq
+SET usertype = 'member'
+FROM [dbo].[divvy_trips_xxxx_qx] dtxq where usertype = 'Subscriber'"
+
+run_query(con,query,"Update divvy_trips_xxxx_qx usertype Subscriber to member")
+```
+## Insert divvy_xxxx_qx into divvy-tripdata
+```{r}
+con
+query = "--INSERT INTO [dbo].[divvy-tripdata](
+--	[ride_id]
+--	,[started_at]
+--	,[ended_at]
+--	,[rideable_type]
+--	,[start_station_name]
+--	,[start_station_id]
+--	,[end_station_name]
+--	,[end_station_id]
+--	,[start_lat]
+--	,[start_lng]
+--	,[end_lat]
+--	,[end_lng]
+--	,[member_casual]
+--	,[ride_length]
+--	,[day_of_week]
+--	  )
+--SELECT 
+--	[trip_id] AS ride_id
+--	,[start_time]
+--	,[end_time]
+--	,'' AS rideable_type
+--	,[from_station_name] AS stat_station_name
+--	,[from_station_id] AS start_station_id
+--	,[to_station_name] AS end_station_name
+--	,[to_station_id] AS end_station_id
+--	,0 AS start_lat
+--	,0 AS start_lng
+--	,0 AS end_lat
+--	,0 AS end_lng
+--	,[usertype] AS member_casual
+--	,CONVERT(char(10),end_time-start_time, 108) AS ride_length
+--	,CAST(CAST(ROUND(DATEPART(WEEKDAY,start_time), 0) AS INT) AS VARCHAR(1)) AS day_of_week
+--  FROM [GDAC].[dbo].[divvy_trips_xxxx_qx]
+-- -- (3818004 rows affected)
+-- -- Completion time: 2025-04-24T10:49:10.9604695-07:00
+"
+# 
+run_query(con,query,"Insert divvy_xxxx_qx into divvy-tripdata")
+```
+##Create analysis table of 2019-2020 data summarizing ride data 
+  By 
+  1. period_yr = YYYY [INT]
+  2. period_mo = MM   [INT]
+  3. cutomer_typ = member_casual
+  4. dow = day_of_week
+  5. time_of_day = caluculated morning, afternoon, or evening
+  6. ride_cou = count of ride_id[s] in the range
+  7. avg_ride_length = the average ride length in the range
+
+###Drop div_py_pm_dow_tod_2019_2020 table if it exists
+```{r Drop div_py_pm_dow_tod_2019_2020 if it exists}
+con
+query="-- IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[div_py_pm_dow_tod_2019_2020]') AND type in (N'U'))
+-- DROP TABLE [dbo].[div_py_pm_dow_tod_2019_2020]
+"
+# 
+run_query(con,query,"Drop div_py_pm_dow_tod_2019_2020")
+```
+
+###Create div_py_pm_dow_tod_2019_2020 table
+```{r}
+con
+query="-- CREATE TABLE [dbo].[div_py_pm_dow_tod_2019_2020](
+	-- [period_yr] [int] NULL,
+	-- [period_mo] [int] NULL,
+	-- [customer_type] [varchar](10) NULL,
+	-- [dow] [varchar](3) NULL,
+	-- [time_of_day] [varchar](9) NOT NULL,
+	-- [ride_count] [int] NULL,
+	-- [avg_ride_length] [int] NULL
+-- ) ON [PRIMARY]"
+# 
+run_query(con,query,"Create table div_py_pm_dow_tod_2019_2020")
+```
+  
+###Load div_py_pm_dow_tod_2019_2020 table
+```{r}
+con
+query="-- INSERT INTO [dbo].[div_py_pm_dow_tod_2019_2020]
+-- SELECT
+--     DATEPART(YEAR, td.started_at) AS period_yr,
+--     DATEPART(MONTH, td.started_at) AS period_mo,
+--     td.member_casual AS customer_type,
+--     CASE td.day_of_week
+--         WHEN 1 THEN 'Sun'
+--         WHEN 2 THEN 'Mon'
+--         WHEN 3 THEN 'Tue'
+--         WHEN 4 THEN 'Wed'
+--         WHEN 5 THEN 'Thu'
+--         WHEN 6 THEN 'Fri'
+--         WHEN 7 THEN 'Sat'
+--     END AS dow,
+--     CASE 
+--         WHEN CONVERT(time, td.started_at) >= '05:00:00' AND CONVERT(time, td.started_at) < '12:00:00' THEN 'morning'
+--         WHEN CONVERT(time, td.started_at) >= '12:00:00' AND CONVERT(time, td.started_at) < '17:00:00' THEN 'afternoon'
+--         ELSE 'evening'
+--     END AS time_of_day,
+--     COUNT(td.ride_id) AS ride_count,
+--     AVG(DATEDIFF(MINUTE, td.started_at, td.ended_at)) AS avg_ride_length
+-- --INTO div_py_pm_dow_tod_2019_2020
+-- FROM dbo.[divvy-tripdata] td WITH (INDEX(div_stat_mc_dow))
+-- WHERE DATEPART(YEAR, td.started_at) IN (2019, 2020)
+-- GROUP BY 
+--     DATEPART(YEAR, td.started_at),
+--     DATEPART(MONTH, td.started_at),
+--     td.member_casual,
+--     td.day_of_week,
+--     CASE 
+--         WHEN CONVERT(time, td.started_at) >= '05:00:00' AND CONVERT(time, td.started_at) < '12:00:00' THEN 'morning'
+--         WHEN CONVERT(time, td.started_at) >= '12:00:00' AND CONVERT(time, td.started_at) < '17:00:00' THEN 'afternoon'
+--         ELSE 'evening'
+--     END
+-- ORDER BY period_yr, period_mo, td.day_of_week, time_of_day;"
+# 
+run_query(con,query,"Load div_py_pm_dow_tod_2019_2020")
+```
+
+### Load data frame div_pid_ct_dow_tod_rc_arl
+```{r load data frame div_pid_ct_dow_tod_rc_arl}
+con
+query="SELECT
+  CAST([period_yr] AS varchar(4)) AS period_year,
+  CAST([period_yr] AS varchar(4)) + RIGHT('0' + CAST([period_mo] AS varchar(2)), 2) AS period_id,
+  [customer_type],
+  [dow],
+  [time_of_day],
+  [ride_count],
+  [avg_ride_length]
+FROM [GDAC].[dbo].[div_py_pm_dow_tod_2019_2020]
+ORDER BY 
+  period_yr, 
+  period_mo,
+  CASE dow 
+    WHEN 'Sun' THEN 1 
+    WHEN 'Mon' THEN 2 
+    WHEN 'Tue' THEN 3  
+    WHEN 'Wed' THEN 4 
+    WHEN 'Thu' THEN 5 
+    WHEN 'Fri' THEN 6 
+    ELSE 7 
+  END,
+  customer_type,
+  CASE time_of_day 
+    WHEN 'morning' THEN 1 
+    WHEN 'afternoon' THEN 2 
+    ELSE 3 
+  END"
+#
+div_pid_ct_dow_tod_rc_arl <- fetch_data(con,query)
+```
+
+
+## Visualizations
+
+Here, we will go through a series of visualizations
+
+#### *Ridership by period*
+```{r}
+ggplot(data=div_pid_ct_dow_tod_rc_arl,aes(x=period_id,y=ride_count))+
+  geom_point(aes(shape=customer_type, color= customer_type))+
+  facet_wrap(~customer_type)+
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position="none") +
+  labs(title = "Casual use increased in 2020 but member use decreased.  Peak use summer",
+       x = "Periods",
+       y = "Rider Counts")
+
+
+```
+# Create a bar plot with vertical x-axis labels
+```{r}
+
+ggplot(div_pid_ct_dow_tod_rc_arl, aes(x = period_id, y = ride_count, fill=ride_count)) +
+  geom_bar(stat = "Identity")+scale_fill_gradient(low="blue",high="red") +
+  facet_wrap(~customer_type)+
+  # theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position="none") +
+  labs(title = "Cas. use increased in 2020 but mbr use decreased.  Usage peak is summer",
+       x = "Periods",
+       y = "Rider Counts")
+```
+
+
+#### *Weekly ridership across 2019-2020*
+```{r}
+## this vector is for weekday sorting
+level_weekdays <- c('Sun', 'Mon','Tue', 'Wed', 'Thu', 'Fri', 'Sat')
+## Plot
+ggplot(data=div_pid_ct_dow_tod_rc_arl,aes(x=factor(dow, level = level_weekdays),y=ride_count))+
+  geom_point(aes(shape=customer_type, color= customer_type))+
+  facet_grid(customer_type ~ period_year)+
+   theme_minimal()+ 
+   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),legend.position="none") +
+  labs(title = "Cas. use higher Friday through Sunday across 2019-2020",
+       x = "Periods",
+       y = "Rider Counts")
+```

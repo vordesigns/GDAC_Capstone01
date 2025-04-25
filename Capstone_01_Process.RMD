@@ -1,0 +1,573 @@
+---
+title: "Capstone 01 Process"
+author: "Tim Andaya"
+date: "2025-04-15"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## It was necessary to create an ODBC connector for an SQL Server
+## due to my preference of working with the datasets stored in 
+## .csv files into a more robust application.
+# ----------------------------------------------------------------------
+```{r}
+install.packages("odbc")
+```
+
+# ----------------------------------------------------------------------
+```{r}
+library(odbc)
+```
+
+# ----------------------------------------------------------------------
+```{r}
+con <- dbConnect(odbc(),
+                 Driver = "SQL Server",
+                 Server = "TABITHA",
+                 Database = "GDAC",
+                 UID = "rgdac",
+                 PWD = rstudioapi::askForPassword("Database password"),
+                 Port = 1433)
+```
+
+# ----------------------------------------------------------------------
+```{r}
+# # ----------------------------------------------------------------------
+# # Helper functions to run the query and report status
+# # ----------------------------------------------------------------------
+#' Run a non-query SQL command
+#' @param con A DBI connection object
+#' @param query SQL query as a string
+#' @param label Optional label for logging
+#' @return NULL, prints message
+#' @export
+run_query <- function(con, query, label = NULL) {
+  tryCatch({
+    result <- DBI::dbExecute(con, query)
+    prefix <- if (!is.null(label)) paste0("[", label, "] ") else ""
+    if (result == 0) {
+      message(prefix, "Commands completed successfully.")
+    } else {
+      message(prefix, result, " rows affected.")
+    }
+  }, error = function(e) {
+    message("Error: ", e$message)
+  })
+}
+
+# # Execute the query (this line triggers the action)
+# run_query(con, query, label = "Create divvy_trips_xxxx_qx")
+
+#' Fetch data from a SQL query
+#'
+#' @param con A DBI connection object
+#' @param query SQL query as a string
+#' @param label Optional label for logging
+#'
+#' @return A data frame containing the result of the query, or NULL on error
+#' @export
+fetch_data <- function(con, query, label = NULL) {
+  tryCatch({
+    df <- DBI::dbGetQuery(con, query)
+    prefix <- if (!is.null(label)) paste0("[", label, "] ") else ""
+    message(prefix, "Query executed. ", nrow(df), " rows returned.")
+    return(df)
+  }, error = function(e) {
+    message("Error: ", e$message)
+    return(NULL)
+  })
+}
+
+```
+
+# ----------------------------------------------------------------------
+```{r Enable python}
+library(reticulate)
+#install.packages("pandas") 
+# remotes::install_github("pandas-dev/pandas") 
+# use_virtualenv("r-reticulate")
+# Method 1: Using py_run_string
+# py_run_string("import pandas as pd\n# Your pandas code here")
+
+```
+
+# ----------------------------------------------------------------------
+#Data:  Initial preparation and import into analysis and/or staging tables
+# ----------------------------------------------------------------------
+##Create analysis table gdac.dbo.divvy-tripdata
+# ----------------------------------------------------------------------
+```{r UNCOMMENT QUERY TO USE, echo=TRUE, message=TRUE, warning=TRUE}
+con
+query="--USE [GDAC]
+--GO
+
+--/****** Object:  Table [dbo].[divvy-tripdata]    Script Date: 4/15/2025 10:13:51 AM ******/
+--IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[divvy-tripdata]') AND type in (N'U'))
+--DROP TABLE [dbo].[divvy-tripdata]
+--GO
+
+--/****** Object:  Table [dbo].[divvy-tripdata]    Script Date: 4/15/2025 10:13:51 AM ******/
+--SET ANSI_NULLS ON
+--GO
+
+--SET QUOTED_IDENTIFIER ON
+--GO
+
+--CREATE TABLE [dbo].[divvy-tripdata](		    --	DTS Import specification
+--	[ride_id] [varchar](20) NULL,				      --	DT_STR	20				      RAW DATA
+--	[rideable_type] [varchar](30) NULL,		  	--	DT_STR	30				      RAW DATA
+--	[started_at] [datetime] NULL,				      --	DT_DATE					        RAW DATA
+--	[ended_at] [datetime] NULL,					      --	DT_DATE					        RAW DATA
+--	[start_station_name] [varchar](50) NULL,	--	DT_STR	50				      RAW DATA
+--	[start_station_id] [int] NULL,				    --	Four Byte Unsigned INT	RAW DATA
+--	[end_station_name] [varchar](50) NULL,		--	DT_STR	50				      RAW DATA
+--	[end_station_id] [int] NULL,				      --	Four Byte Unsigned INT	RAW DATA
+--	[start_lat] [decimal](8, 6) NULL,			    --	Float					          RAW DATA
+--	[start_lng] [decimal](9, 6) NULL,			    --	Float					          RAW DATA
+--	[end_lat] [decimal](8, 6) NULL,				    --	Float					          RAW DATA
+--	[end_lng] [decimal](9, 6) NULL,				    --	Float					          RAW DATA
+--	[member_casual] [varchar](10) NULL,			  --	Float					          RAW DATA
+--	[ride_length] [time](7) NULL,				      --	DT_DATE					        CALCULATED 
+--	[day_of_week] [int] NULL					        --	Four Byte Unsigned INT	CALCULATED
+--) ON [PRIMARY]
+--GO"
+
+# Execute the query (this line triggers the action)
+run_query(con, query, label = "Create table divvy-tripdata in GDAC database")
+```
+# ----------------------------------------------------------------------
+## Create staging table divvy_trips_xxxx_qx
+# ----------------------------------------------------------------------
+```{r UNCOMMENT QUERY TO USE, echo=TRUE, message=TRUE, warning=TRUE}
+# Database connection
+con
+
+# SQL query (currently commented out for modeling)
+query = "USE [GDAC]
+--GO
+
+--/****** Object:  Table [dbo].[divvy_trips_xxxx_qx]    Script Date: 4/21/2025 11:23:08 AM ******/
+--IF  EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[divvy_trips_xxxx_qx]') AND type in (N'U'))
+--DROP TABLE [dbo].[divvy_trips_xxxx_qx]
+--GO
+
+--/****** Object:  Table [dbo].[divvy_trips_xxxx_qx]    Script Date: 4/21/2025 11:23:08 AM ******/
+--SET ANSI_NULLS ON
+--GO
+
+--SET QUOTED_IDENTIFIER ON
+--GO
+
+--CREATE TABLE [dbo].[divvy_trips_xxxx_qx](		    --	DTS Import specification	Comment
+--	[trip_id] [varchar](20) NULL,				    --	DT_
+--	[start_time] [datetime] NULL,				    --	DT_DATE					    RAW DATA
+--	[end_time] [datetime] NULL,						--	DT_DATE					    RAW DATA
+--	[bikeid] [varchar](50) NULL,				    --	DT_STR	50					RAW DATA
+--	[tripduration] [varchar](100) NULL,				--	DT_STR	100					RAW DATA
+--	[from_station_id] [varchar](100) NULL,			--	DT_STR	100					RAW DATA
+--	[from_station_name] [varchar](100) NULL,		--	DT_STR	100					RAW DATA
+--	[to_station_id] [varchar](100) NULL,			--	DT_STR	100					RAW DATA
+--	[to_station_name] [varchar](100) NULL,			--	DT_STR	100					RAW DATA
+--	[usertype] [varchar](100) NULL,					--	DT_STR	100					RAW DATA
+--	[gender] [varchar](50) NULL,				    --	DT_STR	50					RAW DATA
+--	[birthyear] [varchar](50) NULL,				    --	DT_STR	50					RAW DATA
+--	[ride_length] [varchar](50) NULL,				--	DT_STR	50					CALCULATED
+--	[day_of_week] [varchar](50) NULL				--	DT_STR	50					CALCULATED
+--) ON [PRIMARY]
+--GO"
+
+# Execute the query (this line triggers the action)
+run_query(con, query, label = "Create divvy_trips_xxxx_qx")
+
+```
+
+ NOTES:
+      Calculations will need to get adjusted for the non 
+      xxxx-divvy-tripdata files as/if necessary and will be handled 
+      after the files have been imported into either the main analysis
+      database, gdac.dbo.divvy-tripdata, or the staging table created 
+      for the divvy_trips_YYYY_QX files format  
+      Problematic files have commas in the data where numeric values exceed
+      999.99, a reason why I use pipes as a delimiter when I export data; 
+      I created a python script to address this in all data sets.  
+      Additionally, this script will add the two new column headings and 
+      corresponding commas at the data level and finally, confirm that 
+      each line has a hard return.
+
+##Python data cleanup file set 1
+
+```{python Modify xxx-divvy-tripdata CSV Files}
+import csv
+import re
+import os
+from pathlib import Path
+
+def clean_numeric_field(value):
+    if re.fullmatch(r'"[\d,]+\.\d+"', value) or re.fullmatch(r'"[\d,]+"', value):
+        return value.replace(',', '').strip('"')
+    return value
+
+def process_csv(input_file, output_file):
+    if not os.path.exists(input_file):
+        print(f"Input file not found: {input_file}")
+        return
+
+    with open(input_file, 'r', encoding='utf-8', newline='') as infile, \
+         open(output_file, 'w', encoding='utf-8', newline='\n') as outfile:
+
+        reader = csv.reader(infile, delimiter=',', quotechar='"')
+        writer = csv.writer(outfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+        headers = next(reader)
+        headers += ['ride_length', 'day_of_week']
+        writer.writerow(headers)
+
+        line_count = 0
+        for row in reader:
+            cleaned_row = [clean_numeric_field(field) for field in row]
+            cleaned_row += ['', '']
+            writer.writerow(cleaned_row)
+            line_count += 1
+
+        print(f"Processed {line_count} rows. Output saved to: {output_file}")
+
+# === Batch Processing ===
+
+input_dir = Path(r'\\tabitha\gdac$\CS1')
+output_dir = input_dir  # Or change to another Path if needed
+
+# List of input files to process
+file_names = [
+"202004-divvy-tripdata.csv",
+"202005-divvy-tripdata.csv",
+"202006-divvy-tripdata.csv",
+"202007-divvy-tripdata.csv",
+"202008-divvy-tripdata.csv",
+"202009-divvy-tripdata.csv",
+"202010-divvy-tripdata.csv",
+"202011-divvy-tripdata.csv",
+"202012-divvy-tripdata.csv",
+"202101-divvy-tripdata.csv",
+"202102-divvy-tripdata.csv",
+"202103-divvy-tripdata.csv",
+"202104-divvy-tripdata.csv",
+"202105-divvy-tripdata.csv",
+"202106-divvy-tripdata.csv",
+"202107-divvy-tripdata.csv",
+"202108-divvy-tripdata.csv",
+"202109-divvy-tripdata.csv",
+"202110-divvy-tripdata.csv",
+"202111-divvy-tripdata.csv",
+"202112-divvy-tripdata.csv",
+"202201-divvy-tripdata.csv",
+"202202-divvy-tripdata.csv",
+"202203-divvy-tripdata.csv",
+"202204-divvy-tripdata.csv",
+"202205-divvy-tripdata.csv",
+"202206-divvy-tripdata.csv",
+"202207-divvy-tripdata.csv",
+"202208-divvy-tripdata.csv",
+"202209-divvy-publictripdata.csv",
+"202210-divvy-tripdata.csv",
+"202211-divvy-tripdata.csv",
+"202212-divvy-tripdata.csv",
+"202301-divvy-tripdata.csv",
+"202302-divvy-tripdata.csv",
+"202303-divvy-tripdata.csv",
+"202304-divvy-tripdata.csv",
+"202305-divvy-tripdata.csv",
+"202306-divvy-tripdata.csv",
+"202307-divvy-tripdata.csv",
+"202308-divvy-tripdata.csv",
+"202309-divvy-tripdata.csv",
+"202310-divvy-tripdata.csv",
+"202311-divvy-tripdata.csv",
+"202312-divvy-tripdata.csv",
+"202401-divvy-tripdata.csv",
+"202402-divvy-tripdata.csv",
+"202403-divvy-tripdata.csv",
+"202404-divvy-tripdata.csv",
+"202405-divvy-tripdata.csv",
+"202406-divvy-tripdata.csv",
+"202407-divvy-tripdata.csv",
+"202408-divvy-tripdata.csv",
+"202409-divvy-tripdata.csv",
+"202410-divvy-tripdata.csv",
+"202411-divvy-tripdata.csv",
+"202412-divvy-tripdata.csv",
+"202501-divvy-tripdata.csv",
+"202502-divvy-tripdata.csv",
+"202503-divvy-tripdata.csv",
+"Divvy_Trips_2020_Q1.csv"
+]
+
+# Process each file
+for file_name in file_names:
+    input_path = input_dir / file_name
+    output_name = file_name.replace(".csv", "_PyTgt.csv")
+    output_path = output_dir / output_name
+    process_csv(str(input_path), str(output_path))
+
+```
+# ----------------------------------------------------------------------
+## Prepare divvy-trips_xxxx_qx CSV Files
+# ----------------------------------------------------------------------
+```{python Modify divvy-trips_xxxx_qx CSV Files}
+import csv
+import re
+import os
+from pathlib import Path
+
+def clean_numeric_field(value):
+    if re.fullmatch(r'"[\d,]+\.\d+"', value) or re.fullmatch(r'"[\d,]+"', value):
+        return value.replace(',', '').strip('"')
+    return value
+
+def process_csv(input_file, output_file):
+    if not os.path.exists(input_file):
+        print(f"Input file not found: {input_file}")
+        return
+
+    with open(input_file, 'r', encoding='utf-8', newline='') as infile, \
+         open(output_file, 'w', encoding='utf-8', newline='\n') as outfile:
+
+        reader = csv.reader(infile, delimiter=',', quotechar='"')
+        writer = csv.writer(outfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+        headers = next(reader)
+        headers += ['ride_length', 'day_of_week']
+        writer.writerow(headers)
+
+        line_count = 0
+        for row in reader:
+            cleaned_row = [clean_numeric_field(field) for field in row]
+            cleaned_row += ['', '']
+            writer.writerow(cleaned_row)
+            line_count += 1
+
+        print(f"Processed {line_count} rows. Output saved to: {output_file}")
+
+# === Batch Processing ===
+
+input_dir = Path(r'\\tabitha\gdac$\CS1')
+output_dir = input_dir  # Or change to another Path if needed
+
+# List of input files to process
+file_names = [
+    "Divvy_Trips_2019_Q1.csv",
+    "Divvy_Trips_2019_Q2.csv",
+    "Divvy_Trips_2019_Q3.csv",
+    "Divvy_Trips_2019_Q4.csv"
+]
+
+# Process each file
+for file_name in file_names:
+    input_path = input_dir / file_name
+    output_name = file_name.replace(".csv", "_PyTgt.csv")
+    output_path = output_dir / output_name
+    process_csv(str(input_path), str(output_path))
+
+```
+
+# ----------------------------------------------------------------------
+##Load files into tables
+# ----------------------------------------------------------------------
+## Load gdac.dbo.divvy-tripdata table
+# ----------------------------------------------------------------------
+```{r}
+con
+query="	DECLARE @fn as VARCHAR(100);
+	DECLARE @sql as NVARCHAR(500);
+	DECLARE @prt as varchar(100)
+	--
+	TRUNCATE TABLE [dbo].[divvy-tripdata]
+--
+-- BUILD CURSOR1
+--
+GETFILELIST1:
+	BEGIN
+		DECLARE CUR_FILES CURSOR LOCAL FOR SELECT [py_tgt] from [dbo].[divvy-files] WHERE type = 1
+
+		GOTO LOADTABLES1
+
+	END
+--
+-- LOAD TABLES 1
+--
+LOADTABLES1:
+	SET @sql=''
+	BEGIN
+		OPEN CUR_FILES
+			FETCH  NEXT FROM CUR_FILES INTO @fn
+		WHILE @@FETCH_STATUS = 0
+			BEGIN
+				--
+					SET @prt = SUBSTRING(@fn,1,LEN(@fn)-4)
+					SET @sql = 'PRINT	'''+@fn+ '''
+						BULK INSERT [dbo].[divvy-tripdata]
+						FROM ''E:\GDAC\CS1\'+@fn+'''
+						WITH
+						(
+						FIRSTROW = 2,
+						FIELDTERMINATOR = '','',  --CSV field delimiter
+						ROWTERMINATOR = ''\n'',   --Use to shift the control to next row
+						ERRORFILE = ''E:\GDAC\CS1\'+@fn+'_ErrorRows.csv'',
+						TABLOCK
+						)'
+					--PRINT @sql
+					EXEC sp_executesql @sql
+				FETCH NEXT FROM CUR_FILES INTO @fn 
+			END
+		CLOSE CUR_FILES
+		DEALLOCATE CUR_FILES
+	END
+
+--
+-- BUILD CURSOR2
+--
+GETFILELIST2:
+	BEGIN
+		DECLARE CUR_FILES CURSOR LOCAL FOR SELECT [py_tgt] from [dbo].[divvy-files] WHERE type = 2
+
+		GOTO LOADTABLES2
+
+	END
+--
+-- LOAD TABLES 2
+--
+LOADTABLES2:
+	SET @sql=''
+	BEGIN
+		OPEN CUR_FILES
+			FETCH  NEXT FROM CUR_FILES INTO @fn
+		WHILE @@FETCH_STATUS = 0
+			BEGIN
+				--
+					SET @sql = 'PRINT	'''+@fn+ '''
+						BULK INSERT [dbo].[divvy_trips_xxxx_qx]
+						FROM ''E:\GDAC\CS1\'+@fn+'''
+						WITH
+						(
+						FIRSTROW = 2,
+						FIELDTERMINATOR = '','',  --CSV field delimiter
+						ROWTERMINATOR = ''\n'',   --Use to shift the control to next row
+						FORMATFILE = ''E:\GDAC\CS1\divvy_trips_xxxx_qx-c.xml'',
+						ERRORFILE = ''E:\GDAC\CS1\'+@fn+'_ErrorRows.csv'',
+						TABLOCK
+						)'
+					--PRINT @sql
+					EXEC sp_executesql @sql
+				FETCH NEXT FROM CUR_FILES INTO @fn 
+			END
+		CLOSE CUR_FILES
+		DEALLOCATE CUR_FILES
+	END
+
+"
+run_query(con,query)
+```
+
+##Record counts
+
+```{r}
+con
+query="select count(*) from [GDAC].[dbo].[divvy-tripdata]"
+fetch_data(con,query)
+```
+
+I created a cursor script to bulk load the data, I found problems with 
+  the data that were collected near the end of 2024 to March of 2025; 
+  it would seem that some form of collection paradigm shift occurred 
+  in June of 2024
+
+##Divvy_Trips_YYYY_Qx 
+    Files with the naming convention Divvy_Trips_ must be loaded into a 
+    staging table, transformed prior to insertion into 
+    gdac.dbo.divvy-trips_xxxx_qx after they have been modified using 
+    python to add two new columns, ride_length and day_of_week, stripping
+    out commas from numerical values encapsulated by double quotes, and 
+    adding two commas at the end of each data line to create the new
+    field data placeholders.
+    Again, while I could manually import the data, this was inefficient; I 
+    needed a quicker and more streamline method.  On top of that, Excel
+    could not open the larger quarterly files for manipulation without 
+    data loss.
+
+#### Format File
+    I created a format file for the quarterly tables that matched the
+    staging table
+```{xml divvy_trips_xxxx_qx-c.xml}
+<?xml version="1.0"?>
+<BCPFORMAT xmlns="http://schemas.microsoft.com/sqlserver/2004/bulkload/format" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <RECORD>
+  <FIELD ID="1" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="20" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="2" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="24"/>
+  <FIELD ID="3" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="24"/>
+  <FIELD ID="4" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="5" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="6" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="7" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="8" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="9" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="10" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="100" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="11" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="12" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="13" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+  <FIELD ID="14" xsi:type="CharTerm" TERMINATOR="\r\n" MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CS_AS"/>
+ </RECORD>
+ <ROW>
+  <COLUMN SOURCE="1" NAME="trip_id" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="2" NAME="start_time" xsi:type="SQLDATETIME"/>
+  <COLUMN SOURCE="3" NAME="end_time" xsi:type="SQLDATETIME"/>
+  <COLUMN SOURCE="4" NAME="bikeid" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="5" NAME="tripduration" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="6" NAME="from_station_id" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="7" NAME="from_station_name" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="8" NAME="to_station_id" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="9" NAME="to_station_name" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="10" NAME="usertype" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="11" NAME="gender" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="12" NAME="birthyear" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="13" NAME="ride_length" xsi:type="SQLVARYCHAR" NULLABLE="YES"/>
+  <COLUMN SOURCE="14" NAME="day_of_week" xsi:type="SQLVARYCHAR" NULLABLE="YES"/>
+ </ROW>
+</BCPFORMAT>
+```
+
+##Python was used to interate trough the files.
+*Add two column names to the header; ride_length & day_of_week.
+*Add two commas on each data line.
+*Add a hard line return to the end of each line.
+*Each modified file's content was added to a new file.
+
+
+
+
+  		
+	###Outlier data set
+		This data set loaded directly into the divvy-tripdata table
+		
+    E:\GDAC\CS1\Divvy_Trips_2020_Q1.csv
+		loaded directly into divvy-tripdata
+
+###Calculations for divvy_trips_xxxx_qx via SQL
+  *Update Ride length by getting the difference between the end time and the
+    start time.
+  *Update Day of the week by extracting the "Weekday" from the start date
+
+```{r}
+con
+query="UPDATE dtxq
+       set ride_length = CONVERT(char(10),end_time-start_time, 108)
+      	,day_of_week =CAST(CAST(ROUND(DATEPART(WEEKDAY,start_time), 0) AS INT) AS VARCHAR(1))
+       FROM [GDAC].[dbo].[divvy_trips_xxxx_qx] dtxq"
+rows_affected <- dbExecute(con, query)
+print(paste(rows_affected, "rows affected"))
+```
+
+
+

@@ -1,0 +1,194 @@
+---
+title: "Capstone 1Divvy Charts"
+author: "Tim Andaya"
+date: "2025-04-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## It was necessary to create an ODBC connector for an SQL Server
+## due to my preference of working with the datasets stored in 
+## .csv files into a more robust application.
+# ----------------------------------------------------------------------
+Packages loaded
+*odbc
+*tidyverse
+```{r}
+# install.packages("odbc")
+# install.packages("tidyverse")
+
+```
+
+# ----------------------------------------------------------------------
+Libraries  and functions used
+*odbc
+*tidyvers
+
+```{r}
+library(odbc)
+library(tidyverse)
+```
+# ----------------------------------------------------------------------
+
+```{r}
+con <- dbConnect(odbc(),
+                 Driver = "SQL Server",
+                 Server = "TABITHA",
+                 Database = "GDAC",
+                 UID = "rgdac",
+                 PWD = rstudioapi::askForPassword("Database password"),
+                 Port = 1433)
+```
+
+*run_query
+*fectch_data
+
+```{r}
+# # ----------------------------------------------------------------------
+# # Helper functions to run the query and report status
+# # ----------------------------------------------------------------------
+#' Run a non-query SQL command
+#' @param con A DBI connection object
+#' @param query SQL query as a string
+#' @param label Optional label for logging
+#' @return NULL, prints message
+#' @export
+run_query <- function(con, query, label = NULL) {
+  tryCatch({
+    result <- DBI::dbExecute(con, query)
+    prefix <- if (!is.null(label)) paste0("[", label, "] ") else ""
+    if (result == 0) {
+      message(prefix, "Commands completed successfully.")
+    } else {
+      message(prefix, result, " rows affected.")
+    }
+  }, error = function(e) {
+    message("Error: ", e$message)
+  })
+}
+
+# # Execute the query (this line triggers the action)
+# run_query(con, query, label = "Create divvy_trips_xxxx_qx")
+
+#' Fetch data from a SQL query
+#'
+#' @param con A DBI connection object
+#' @param query SQL query as a string
+#' @param label Optional label for logging
+#'
+#' @return A data frame containing the result of the query, or NULL on error
+#' @export
+fetch_data <- function(con, query, label = NULL) {
+  tryCatch({
+    df <- DBI::dbGetQuery(con, query)
+    prefix <- if (!is.null(label)) paste0("[", label, "] ") else ""
+    message(prefix, "Query executed. ", nrow(df), " rows returned.")
+    return(df)
+  }, error = function(e) {
+    message("Error: ", e$message)
+    return(NULL)
+  })
+}
+
+```
+
+# ----------------------------------------------------------------------
+### Load data frame div_pid_ct_dow_tod_rc_arl
+This is taken from a subset of the tripdata data set provided for this
+  project.
+
+```{r load data frame div_pid_ct_dow_tod_rc_arl}
+con
+query="SELECT
+  CAST([period_yr] AS varchar(4)) AS period_year,
+  CAST([period_yr] AS varchar(4)) + RIGHT('0' + CAST([period_mo] AS varchar(2)), 2) AS period_id,
+  [customer_type],
+  [dow],
+  [time_of_day],
+  [ride_count],
+  [avg_ride_length]
+FROM [GDAC].[dbo].[div_py_pm_dow_tod_2019_2020]
+ORDER BY 
+  period_yr, 
+  period_mo,
+  CASE dow 
+    WHEN 'Sun' THEN 1 
+    WHEN 'Mon' THEN 2 
+    WHEN 'Tue' THEN 3  
+    WHEN 'Wed' THEN 4 
+    WHEN 'Thu' THEN 5 
+    WHEN 'Fri' THEN 6 
+    ELSE 7 
+  END,
+  customer_type,
+  CASE time_of_day 
+    WHEN 'morning' THEN 1 
+    WHEN 'afternoon' THEN 2 
+    ELSE 3 
+  END"
+#
+div_pid_ct_dow_tod_rc_arl <- fetch_data(con,query)
+div_pid_ct_dow_tod_rc_arl
+```
+
+# ----------------------------------------------------------------------
+# Create Visualizations
+# ----------------------------------------------------------------------
+This chart shows that casual ridership increased in 2020 over 2019
+  and that ridership decreased for member users during 2020.
+This chart also shows that ridership is higher during the warmer months 
+  of the year from May through September/October.
+##* *2019-2020 Monthly Ridership Chart One*
+
+```{r}
+ggplot(data=div_pid_ct_dow_tod_rc_arl,aes(x=period_id,y=ride_count))+
+  geom_point(aes(shape=customer_type, color= customer_type))+
+  facet_wrap(~customer_type)+
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1), legend.position="none") +
+  labs(title = "Casual use increased in 2020 but member use decreased.  Peak use summer",
+       x = "Periods",
+       y = "Rider Counts")
+
+```
+
+# ----------------------------------------------------------------------
+##*2019-2020 Monthly Ridership Chart Two*
+This is an alternate view of 2019-2020 ridership data.
+
+```{r}
+
+ggplot(div_pid_ct_dow_tod_rc_arl, aes(x = period_id, y = ride_count, fill=ride_count)) +
+  geom_bar(stat = "Identity")+scale_fill_gradient(low="blue",high="red") +
+  facet_wrap(~customer_type)+
+  # theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position="none") +
+  labs(title = "Cas. use increased in 2020 but mbr use decreased.  Usage peak is summer",
+       x = "Periods",
+       y = "Rider Counts")
+```
+
+# ----------------------------------------------------------------------
+##*Weekly ridership across 2019-2020*
+This chart shows the weekly ridership tendencies of the two types of 
+  riders.  Fridays, Saturdays, and Sundays are the most popular days for
+  casual riders and Monday, Tuesday, Wednesday and Thursday are the most
+  popular for the members.
+  Ridership for members is down in 2020
+
+```{r}
+## this vector is for weekday sorting
+level_weekdays <- c('Sun', 'Mon','Tue', 'Wed', 'Thu', 'Fri', 'Sat')
+## Plot
+ggplot(data=div_pid_ct_dow_tod_rc_arl,aes(x=factor(dow, level = level_weekdays),y=ride_count))+
+  geom_point(aes(shape=customer_type, color= customer_type))+
+  facet_grid(customer_type ~ period_year)+
+   theme_minimal()+ 
+   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),legend.position="none") +
+  labs(title = "Cas. use higher Friday through Sunday across 2019-2020",
+       x = "Periods",
+       y = "Rider Counts")
+```
